@@ -3,30 +3,47 @@ import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
 import Logout from "./Logout";
 
-function App() {
+// ✅ PublicRoute: Redirects to dashboard if already logged in
+function PublicRoute({ children }) {
   const adminToken = localStorage.getItem("adminToken");
+  return adminToken ? <Navigate to="/admin/dashboard" replace /> : children;
+}
 
+// ✅ PrivateRoute: Redirects to login if not logged in
+function PrivateRoute({ children }) {
+  const adminToken = localStorage.getItem("adminToken");
+  return adminToken ? children : <Navigate to="/admin/login" replace />;
+}
+
+function App() {
   return (
     <Router>
       <Routes>
-        {/* Login page */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-
-        {/* Dashboard (Protected Route) */}
+        {/* ✅ Admin Login (Public Route) */}
         <Route
-          path="/admin/dashboard"
+          path="/admin/login"
           element={
-            adminToken ? (
-              <AdminDashboard />
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
+            <PublicRoute>
+              <AdminLogin />
+            </PublicRoute>
           }
         />
 
-        {/* Default route */}
+        {/* ✅ Admin Dashboard (Protected Route) */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <PrivateRoute>
+              <AdminDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ✅ Logout */}
+        <Route path="/logout" element={<Logout />} />
+
+        {/* ✅ Default route */}
         <Route path="*" element={<Navigate to="/admin/login" replace />} />
-          <Route path="/logout" element={<Logout />} />
       </Routes>
     </Router>
   );

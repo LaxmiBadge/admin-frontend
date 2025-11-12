@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash, FaUserShield } from "react-icons/fa";
@@ -10,49 +10,57 @@ function AdminLogin() {
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const mountedRef = useRef(false);
 
-  // ✅ Fixed useEffect infinite loop
+  // ✅ Safe effect with cleanup (no infinite loop)
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (token && window.location.pathname !== "/admin/dashboard") {
-      navigate("/admin/dashboard");
+    mountedRef.current = true;
+    try {
+      const token = localStorage.getItem("adminToken");
+      if (token && window.location.pathname !== "/admin/dashboard") {
+        navigate("/admin/dashboard");
+      }
+    } catch (err) {
+      console.error("Auth check error:", err);
     }
+    return () => {
+      mountedRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-
     try {
       const res = await axios.post(
         "https://ecommerce-backend-y1bv.onrender.com/api/user/login",
         formData,
         { headers: { "Content-Type": "application/json" } }
       );
-
       if (res.status === 200 && res.data.accessToken) {
         localStorage.setItem("adminToken", res.data.accessToken);
-        localStorage.setItem("admin", JSON.stringify(res.data.admin));
+        localStorage.setItem("admin", JSON.stringify(res.data.admin || {}));
         navigate("/admin/dashboard");
       } else {
         throw new Error("Invalid response");
       }
     } catch (error) {
       console.error("Admin login failed:", error);
-      setMessage("Invalid admin credentials. Please try again.");
+      if (mountedRef.current)
+        setMessage("Invalid admin credentials. Please try again.");
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#002349] via-[#183d6b] to-[#0096FF] overflow-hidden">
-      {/* Left Side Illustration Section */}
+      {/* Left Side Illustration */}
       <motion.div
         initial={{ x: -60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
