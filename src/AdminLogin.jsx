@@ -1,190 +1,120 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaUserShield } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 function AdminLogin() {
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const mountedRef = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
 
-  // ✅ Safe effect with cleanup (no infinite loop)
-  useEffect(() => {
-    mountedRef.current = true;
-    try {
-      const token = localStorage.getItem("adminToken");
-      if (token && window.location.pathname !== "/admin/dashboard") {
-        navigate("/admin/dashboard");
-      }
-    } catch (err) {
-      console.error("Auth check error:", err);
-    }
-    return () => {
-      mountedRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage("");
     try {
       const res = await axios.post(
-        "https://ecommerce-backend-y1bv.onrender.com/api/user/login",
-        formData,
-        { headers: { "Content-Type": "application/json" } }
+        "http://localhost:5000/api/admin/login",
+        form
       );
-      if (res.status === 200 && res.data.accessToken) {
-        localStorage.setItem("adminToken", res.data.accessToken);
-        localStorage.setItem("admin", JSON.stringify(res.data.admin || {}));
-        navigate("/admin/dashboard");
-      } else {
-        throw new Error("Invalid response");
-      }
-    } catch (error) {
-      console.error("Admin login failed:", error);
-      if (mountedRef.current)
-        setMessage("Invalid admin credentials. Please try again.");
-    } finally {
-      if (mountedRef.current) setLoading(false);
+      localStorage.setItem("adminToken", res.data.token);
+      navigate("/admin/dashboard");
+    } catch (err) {
+      alert("Invalid login credentials");
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#002349] via-[#183d6b] to-[#0096FF] overflow-hidden">
-      {/* Left Side Illustration */}
-      <motion.div
-        initial={{ x: -60, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="hidden md:flex md:w-1/2 justify-center items-center relative text-white px-10"
-      >
-        <div className="space-y-6 z-10">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="text-5xl font-extrabold leading-tight drop-shadow-lg"
+    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-gradient-to-br from-blue-900 via-gray-900 to-black overflow-hidden relative">
+
+      {/* LEFT SIDE - TITLE SECTION */}
+      <div className="flex flex-col justify-center items-center px-12 py-20 text-white">
+        
+        <div className="text-center md:text-left">
+          <h1 className="text-5xl font-extrabold tracking-wide drop-shadow-lg">
+            Admin Portal
+          </h1>
+
+          <p className="text-gray-300 text-lg mt-4 max-w-md">
+            Manage products, users, orders, reports, analytics and everything in one secure place.
+          </p>
+
+          {/* Decorative Line */}
+          <div className="mt-6 h-1 w-32 bg-gradient-to-r from-blue-500 to-blue-300 rounded-full shadow-lg"></div>
+        </div>
+      </div>
+
+     {/* RIGHT SIDE LOGIN FORM */}
+<div className="flex justify-center items-center p-8 md:p-16">
+
+  <div className="relative w-full max-w-md rounded-3xl p-[2px]
+      bg-gradient-to-br from-gray-900 via-blue-900 to-black shadow-xl">
+
+    <div className="backdrop-blur-xl bg-gray-900/80 rounded-3xl p-10
+        border border-blue-900/40 shadow-[0_0_25px_rgba(0,40,255,0.2)]
+        hover:shadow-[0_0_45px_rgba(0,40,255,0.35)]
+        transition-all duration-300">
+
+      <h2 className="text-4xl font-extrabold text-white text-center mb-10 tracking-wide">
+        Sign In
+      </h2>
+
+      <form onSubmit={handleLogin} className="space-y-7">
+
+        {/* EMAIL */}
+        <div className="group">
+          <label className="text-gray-300 text-sm">Email Address</label>
+          <input
+            type="email"
+            required
+            className="w-full mt-2 px-4 py-3.5 rounded-xl bg-gray-900 text-white
+            border border-blue-900/40
+            group-hover:border-blue-600 transition-all duration-300
+            focus:ring-2 focus:ring-blue-500 outline-none shadow-md"
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+        </div>
+
+        {/* PASSWORD */}
+        <div className="relative group">
+          <label className="text-gray-300 text-sm">Password</label>
+
+          <input
+            type={showPassword ? 'text' : 'password'}
+            required
+            className="w-full mt-2 px-4 py-3.5 rounded-xl bg-gray-900 text-white
+            border border-blue-900/40
+            group-hover:border-blue-600 transition-all duration-300
+            focus:ring-2 focus:ring-blue-500 outline-none shadow-md"
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
+
+          <span
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-12 text-gray-400 hover:text-white cursor-pointer"
           >
-            Welcome Back,
-            <br /> <span className="text-[#00BFFF]">Admin!</span>
-          </motion.h1>
-          <p className="text-lg text-gray-200 max-w-md">
-            Manage users, view analytics, and control your system — all in one
-            secure dashboard.
-          </p>
+            {showPassword ? <FaEyeSlash /> : <FaEye />}
+          </span>
         </div>
-        <div className="absolute inset-0 bg-[url('https://cdn.dribbble.com/users/1162077/screenshots/3848914/programmer.gif')] bg-cover bg-center opacity-20"></div>
-      </motion.div>
 
-      {/* Right Side Login Form */}
-      <motion.div
-        initial={{ x: 60, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="flex-1 flex justify-center items-center bg-white md:rounded-l-[50px] shadow-2xl py-12 px-6 sm:px-10"
-      >
-        <div className="w-full max-w-md space-y-8">
-          {/* Header */}
-          <div className="text-center">
-            <div className="flex justify-center mb-4">
-              <motion.div
-                whileHover={{ rotate: 15 }}
-                className="p-4 bg-[#002349] text-white rounded-full text-3xl shadow-md"
-              >
-                <FaUserShield />
-              </motion.div>
-            </div>
-            <h2 className="text-3xl font-bold text-[#002349]">
-              Admin Login
-            </h2>
-            <p className="text-gray-500 mt-1">
-              Access your admin control panel
-            </p>
-          </div>
+        {/* BUTTON */}
+        <button
+          type="submit"
+          className="w-full py-3.5 rounded-xl bg-blue-900
+          text-white font-bold text-lg tracking-wide transition-all duration-300
+          hover:bg-blue-800 hover:shadow-[0_0_25px_rgba(0,80,255,0.5)]
+          hover:scale-[1.03]"
+        >
+          Login
+        </button>
+      </form>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                autoComplete="username"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#002349] focus:outline-none"
-                placeholder="admin@email.com"
-                required
-              />
-            </div>
+      <p className="text-center text-gray-500 text-xs mt-10">
+        © {new Date().getFullYear()} Admin Portal
+      </p>
+    </div>
+  </div>
+</div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  autoComplete="current-password"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#002349] focus:outline-none pr-10"
-                  placeholder="Enter your password"
-                  required
-                />
-                <span
-                  className="absolute right-4 top-3.5 text-gray-500 cursor-pointer hover:text-[#002349]"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
-              </div>
-            </div>
 
-            {/* Login Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              type="submit"
-              disabled={loading}
-              className={`w-full py-3 rounded-lg font-semibold text-white text-lg transition-all ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-[#002349] hover:bg-[#183d6b]"
-              }`}
-            >
-              {loading ? "Logging in..." : "Login"}
-            </motion.button>
-          </form>
-
-          {/* Error Message */}
-          {message && (
-            <p className="text-center text-red-600 font-medium mt-4">
-              {message}
-            </p>
-          )}
-
-          {/* Footer */}
-          <p className="text-sm text-gray-400 text-center mt-8">
-            © {new Date().getFullYear()} Secure Admin Portal | All Rights
-            Reserved
-          </p>
-        </div>
-      </motion.div>
     </div>
   );
 }
