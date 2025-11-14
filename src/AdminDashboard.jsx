@@ -11,7 +11,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="ml-16 md:ml-64 flex-1 bg-gray-100 min-h-screen p-6 transition-all duration-300">
         {/* ✅ Navbar */}
-        <Navbar />
+        
 
         {/* ✅ Dashboard Cards */}
         <h1 className="text-3xl font-semibold text-gray-800 mb-6">
