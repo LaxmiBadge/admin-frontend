@@ -12,7 +12,7 @@ function AdminLogin() {
     e.preventDefault();
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/admin/login",
+        "https://ecommerce-backend-y1bv.onrender.com/api/admin/login",
         form
       );
       localStorage.setItem("adminToken", res.data.token);
