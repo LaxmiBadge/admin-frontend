@@ -3,6 +3,8 @@ import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
 import AddProduct from "./pages/products/AddProduct";
 import AllProducts from "./pages/products/AllProducts";
+import EditProduct from "./pages/products/EditProduct";
+import ProductDetailsView from "./pages/products/ProductDetailsView"; // <-- ADD THIS
 import Logout from "./Logout";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
@@ -30,17 +32,25 @@ function Layout({ children }) {
 
       <div className={`flex-1 ${!hideLayout ? "ml-[10px]" : ""} p-2`}>
         {!hideLayout && <Navbar />}
-        {children} {/* Render actual page content */}
+        {children}
       </div>
     </div>
   );
 }
+
+// Wrapper to extract productId from URL params for ProductDetailsView
+import { useParams } from "react-router-dom";
+const ProductDetailsWrapper = () => {
+  const { productId } = useParams();
+  return <ProductDetailsView productId={productId} />;
+};
 
 function App() {
   return (
     <Router>
       <Layout>
         <Routes>
+          {/* LOGIN */}
           <Route
             path="/admin/login"
             element={
@@ -50,6 +60,7 @@ function App() {
             }
           />
 
+          {/* DASHBOARD */}
           <Route
             path="/admin/dashboard"
             element={
@@ -59,6 +70,7 @@ function App() {
             }
           />
 
+          {/* ADD PRODUCT */}
           <Route
             path="/admin/products/add"
             element={
@@ -68,6 +80,7 @@ function App() {
             }
           />
 
+          {/* ALL PRODUCTS */}
           <Route
             path="/admin/products/all"
             element={
@@ -77,7 +90,30 @@ function App() {
             }
           />
 
+          {/* EDIT PRODUCT PAGE */}
+          <Route
+            path="/admin/products/edit/:id"
+            element={
+              <PrivateRoute>
+                <EditProduct />
+              </PrivateRoute>
+            }
+          />
+
+          {/* PRODUCT DETAILS PAGE */}
+          <Route
+            path="/admin/products/view/:productId"
+            element={
+              <PrivateRoute>
+                <ProductDetailsWrapper />
+              </PrivateRoute>
+            }
+          />
+
+          {/* LOGOUT */}
           <Route path="/logout" element={<Logout />} />
+
+          {/* DEFAULT REDIRECT */}
           <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>
       </Layout>

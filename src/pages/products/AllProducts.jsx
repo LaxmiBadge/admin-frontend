@@ -1,8 +1,10 @@
 // src/pages/products/AllProducts.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import AddProduct from "./AddProduct";
+import EditProduct from "./EditProduct";
 import {
   FaTrash,
   FaEdit,
@@ -231,6 +233,7 @@ const AllProducts = ({ sidebarOpen = true }) => {
     setSort("");
     setPage(1);
   };
+   const navigate = useNavigate();
 
   return (
     <div className={`min-h-screen transition-all duration-300 ${sidebarOpen ? "ml-[260px]" : "ml-0"} bg-gradient-to-b from-[#f5f7fb] to-[#e8f0ff] py-10`}>
@@ -251,13 +254,15 @@ const AllProducts = ({ sidebarOpen = true }) => {
               Reset
             </button>
 
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#5b8cff] to-[#6a2cff] text-white shadow-lg transform hover:-translate-y-0.5 transition"
-              title="Add product"
-            >
-              <FaPlus /> Add Product
-            </button>
+         <button
+  onClick={() => navigate("/admin/products/add")}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#5b8cff] to-[#6a2cff] text-white shadow-lg transform hover:-translate-y-0.5 transition"
+  title="Add product"
+>
+  <FaPlus /> Add Product
+</button>
+
+
           </div>
         </div>
 
@@ -596,14 +601,11 @@ const AllProducts = ({ sidebarOpen = true }) => {
               <motion.div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditProduct(null)} />
               <motion.div className="relative w-full max-w-3xl mx-4" variants={modalBox} initial="hidden" animate="visible" exit="exit">
                 <div className="bg-white rounded-3xl p-4 shadow-2xl border border-white/30">
-                  <AddProduct
-                    initialData={editProduct}
-                    onSaved={(p) => {
-                      handleSaved(p);
-                      setEditProduct(null);
-                    }}
-                    closeModal={() => setEditProduct(null)}
-                  />
+                 <EditProduct
+            productId={editProduct._id}
+            onUpdated={(updated) => { handleSaved(updated); setEditProduct(null); }}
+            closeModal={() => setEditProduct(null)}
+          />
                 </div>
               </motion.div>
             </motion.div>
