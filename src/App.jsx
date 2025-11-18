@@ -4,24 +4,24 @@ import AdminDashboard from "./AdminDashboard";
 import AddProduct from "./pages/products/AddProduct";
 import AllProducts from "./pages/products/AllProducts";
 import EditProduct from "./pages/products/EditProduct";
-import ProductDetailsView from "./pages/products/ProductDetailsView"; // <-- ADD THIS
+import ProductDetailsView from "./pages/products/ProductDetailsView";
 import Logout from "./Logout";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 
-// PublicRoute: Redirects to dashboard if already logged in
+// PUBLIC ROUTE
 function PublicRoute({ children }) {
   const adminToken = localStorage.getItem("adminToken");
   return adminToken ? <Navigate to="/admin/dashboard" replace /> : children;
 }
 
-// PrivateRoute: Redirects to login if not logged in
+// PRIVATE ROUTE
 function PrivateRoute({ children }) {
   const adminToken = localStorage.getItem("adminToken");
   return adminToken ? children : <Navigate to="/admin/login" replace />;
 }
 
-// Layout wraps pages and conditionally shows Sidebar & Navbar
+// LAYOUT
 function Layout({ children }) {
   const location = useLocation();
   const hideLayout = location.pathname === "/admin/login";
@@ -30,7 +30,7 @@ function Layout({ children }) {
     <div className="flex">
       {!hideLayout && <Sidebar />}
 
-      <div className={`flex-1 ${!hideLayout ? "ml-[10px]" : ""} p-2`}>
+      <div className={`flex-1 p-2 ${hideLayout ? "" : "ml-[40px]"}`}>
         {!hideLayout && <Navbar />}
         {children}
       </div>
@@ -38,18 +38,12 @@ function Layout({ children }) {
   );
 }
 
-// Wrapper to extract productId from URL params for ProductDetailsView
-import { useParams } from "react-router-dom";
-const ProductDetailsWrapper = () => {
-  const { productId } = useParams();
-  return <ProductDetailsView productId={productId} />;
-};
-
 function App() {
   return (
     <Router>
       <Layout>
         <Routes>
+
           {/* LOGIN */}
           <Route
             path="/admin/login"
@@ -90,7 +84,7 @@ function App() {
             }
           />
 
-          {/* EDIT PRODUCT PAGE */}
+          {/* EDIT PRODUCT */}
           <Route
             path="/admin/products/edit/:id"
             element={
@@ -100,12 +94,12 @@ function App() {
             }
           />
 
-          {/* PRODUCT DETAILS PAGE */}
+          {/* PRODUCT DETAILS — FIXED */}
           <Route
-            path="/admin/products/view/:productId"
+            path="/admin/products/view/:id"
             element={
               <PrivateRoute>
-                <ProductDetailsWrapper />
+                <ProductDetailsView />
               </PrivateRoute>
             }
           />

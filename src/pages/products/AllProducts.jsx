@@ -542,37 +542,53 @@ const AllProducts = ({ sidebarOpen = true }) => {
         </div>
 
         {/* VIEW MODAL */}
-        <AnimatePresence>
-          {viewProduct && (
-            <motion.div className="fixed inset-0 z-50 flex items-center justify-center" variants={modalBackdrop} initial="hidden" animate="visible" exit="exit">
-              <motion.div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setViewProduct(null)} />
-              <motion.div className="relative w-full max-w-3xl mx-4" variants={modalBox} initial="hidden" animate="visible" exit="exit">
-                <div className="bg-white rounded-3xl p-6 shadow-2xl border border-white/30">
-                  <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-xl font-semibold text-[#062e57]">{viewProduct.name}</h2>
-                    <button onClick={() => setViewProduct(null)} className="text-gray-500">Close</button>
-                  </div>
+<AnimatePresence>
+  {viewProduct && (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      variants={modalBackdrop}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      {/* backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => setViewProduct(null)}
+      />
 
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <img src={viewProduct.images?.[0] || viewProduct.image || "/no-image.png"} alt={viewProduct.name} className="w-full h-64 object-cover rounded-lg" />
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2"><strong>Brand:</strong> {viewProduct.brand || "—"}</p>
-                      <p className="text-sm text-gray-600 mb-2"><strong>Category:</strong> {viewProduct.category || "—"}</p>
-                      <p className="text-sm text-gray-600 mb-2"><strong>Price:</strong> ₹{(viewProduct.basePrice ?? viewProduct.price ?? 0)}</p>
-                      <p className="text-sm text-gray-600 mb-2"><strong>Discount:</strong> {getDiscountValue(viewProduct)}%</p>
-                      <p className="text-sm text-gray-600 mb-2"><strong>Stock:</strong> {viewProduct.stock}</p>
-                      <p className="text-sm text-gray-600">{viewProduct.description}</p>
-                    </div>
-                  </div>
+      {/* modal box */}
+      <motion.div
+        className="relative w-full max-w-3xl mx-4 bg-white rounded-3xl shadow-xl p-6"
+        variants={modalBox}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+      >
+        <h2 className="text-xl font-semibold mb-4 text-gray-800">
+          {viewProduct.name}
+        </h2>
+        <p className="text-gray-600 mb-4 line-clamp-3">{viewProduct.description}</p>
 
-                  <div className="mt-6 flex gap-3 justify-end">
-                    <button className="px-4 py-2 bg-gradient-to-r from-[#5b8cff] to-[#6a2cff] text-white rounded-full" onClick={() => setViewProduct(null)}>Close</button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => navigate(`/admin/products/view/${viewProduct._id}`)}
+            className="px-4 py-2 rounded-md bg-gradient-to-r from-[#5b8cff] to-[#6a2cff] text-white hover:scale-105 transition"
+          >
+            View Details
+          </button>
+          <button
+            onClick={() => setViewProduct(null)}
+            className="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:scale-105 transition"
+          >
+            Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
 
         {/* ADD MODAL */}
         <AnimatePresence>
