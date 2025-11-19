@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { FaCheckCircle, FaTimesCircle, FaStar } from "react-icons/fa";
+import AdminLayout from "../../components/AdminLayout";
 
 const ProductDetailsView = () => {
   const { id } = useParams();
+  const navigate = useNavigate(); // fixed
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    console.log("Product ID from URL:", id);
-
     if (!id) {
       setError("Invalid product ID in URL");
       setLoading(false);
@@ -27,7 +27,6 @@ const ProductDetailsView = () => {
           { timeout: 15000 }
         );
 
-        console.log("Product Response:", res.data);
         setProduct(res.data);
       } catch (err) {
         console.error("API ERROR:", err.response?.data || err.message);
@@ -48,13 +47,29 @@ const ProductDetailsView = () => {
     product?.images?.length > 0 ? product.images[0] : "/no-image.png";
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen ">
-      <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
+    <AdminLayout>
+    <div className="p-6 bg-gray-100 min-h-screen">
+    <div
+      className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden 
+                 p-6 "
+    >
+
+        {/* BACK BUTTON */}
+        <div className="p-4">
+          <button
+            onClick={() => navigate("/admin/products/all")}
+            className="px-4 py-2 rounded-lg font-medium shadow transition"
+            style={{
+              backgroundColor: "#0A1A3A",
+              color: "#FFFFFF",
+            }}
+          >
+            ← Back to Products
+          </button>
+        </div>
 
         {/* TOP SECTION */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-
-          {/* IMAGE */}
           <div className="flex justify-center items-center">
             <img
               src={imageSrc}
@@ -63,9 +78,10 @@ const ProductDetailsView = () => {
             />
           </div>
 
-          {/* PRODUCT INFO */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">{product?.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {product?.name}
+            </h1>
             <p className="text-sm text-gray-600">
               {product?.brand || "Unknown"} • {product?.model || "N/A"}
             </p>
@@ -108,7 +124,9 @@ const ProductDetailsView = () => {
             {/* SIZES */}
             {product?.sizes?.length > 0 && (
               <div className="mt-3">
-                <p className="text-gray-700 font-semibold mb-1">Available Sizes:</p>
+                <p className="text-gray-700 font-semibold mb-1">
+                  Available Sizes:
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {product.sizes.map((size, index) => (
                     <span
@@ -134,7 +152,9 @@ const ProductDetailsView = () => {
 
         {/* CATEGORY */}
         <div className="border-t p-6">
-          <h2 className="text-xl font-semibold text-gray-800">Category Details</h2>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Category Details
+          </h2>
           <ul className="mt-2 text-gray-700 list-disc list-inside">
             <li>Category: {product?.category || "N/A"}</li>
             <li>Sub Category: {product?.subCategory || "N/A"}</li>
@@ -151,9 +171,13 @@ const ProductDetailsView = () => {
 
         {/* SHIPPING */}
         <div className="border-t p-6">
-          <h2 className="text-xl font-semibold text-gray-800">Shipping Details</h2>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Shipping Details
+          </h2>
           <p>Dimensions Unit: {product?.shipping?.dimensions?.unit || "N/A"}</p>
-          <p>Shipping Charge: ₹{product?.shipping?.shippingCharge || 0}</p>
+          <p>
+            Shipping Charge: ₹{product?.shipping?.shippingCharge || 0}
+          </p>
         </div>
 
         {/* SHARE ANALYTICS */}
@@ -226,6 +250,7 @@ const ProductDetailsView = () => {
         </div>
       </div>
     </div>
+    </AdminLayout>
   );
 };
 

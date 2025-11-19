@@ -1,5 +1,3 @@
-// src/components/Sidebar.jsx
-
 import React, { useState } from "react";
 import {
   FaTachometerAlt,
@@ -8,105 +6,171 @@ import {
   FaUsers,
   FaChartBar,
   FaSignOutAlt,
-  FaBars,
+  FaChevronLeft,
 } from "react-icons/fa";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
-const Sidebar = () => {
-  const [open, setOpen] = useState(true);
+const Sidebar = ({ isOpen, toggleSidebar }) => {
+  const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
+  const GOLD = "#E4C16F";
+
   const menus = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
-
-    // ⭐ ONLY THIS PRODUCT BUTTON
-    { name: "Products", icon: <FaBoxOpen />, path: "/admin/products/all" },
-
-    { name: "Orders", icon: <FaShoppingCart />, path: "/admin/orders" },
-    { name: "Customers", icon: <FaUsers />, path: "/admin/customers" },
-    { name: "Reports", icon: <FaChartBar />, path: "/admin/reports" },
+    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
+    { label: "Products", icon: <FaBoxOpen />, path: "/admin/products/all" },
+    { label: "Orders", icon: <FaShoppingCart />, path: "/admin/orders" },
+    { label: "Customers", icon: <FaUsers />, path: "/admin/customers" },
+    { label: "Reports", icon: <FaChartBar />, path: "/admin/reports" },
   ];
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
-    localStorage.removeItem("adminName");
     navigate("/admin/login");
   };
 
   return (
     <>
-      {/* MOBILE TOGGLE BUTTON */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="md:hidden fixed top-[80px] left-4 z-50 p-2 bg-blue-900 text-white rounded-lg shadow-lg"
+      {/* DESKTOP SIDEBAR */}
+      <motion.aside
+        animate={{ width: collapsed ? "85px" : "260px" }}
+        transition={{ duration: 0.3 }}
+        className="
+          hidden md:flex flex-col
+          fixed top-16 left-0
+          h-[calc(100vh-64px)]
+          bg-blue-950/95 backdrop-blur-xl
+          shadow-xl border-r border-[rgba(255,255,255,0.08)]
+          py-6 z-40
+          transition-all duration-300
+        "
       >
-        <FaBars size={20} />
-      </button>
-
-      {/* SIDEBAR */}
-      <motion.div
-        animate={{ width: open ? 260 : 85 }}
-        className="h-screen bg-blue-950 text-white border-r border-blue-800 shadow-xl 
-          fixed left-0 top-[72px] flex flex-col transition-all duration-300 z-40"
-      >
-        {/* LOGO */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-blue-800">
-          <div className="w-12 h-12 rounded-xl bg-blue-800 flex items-center justify-center text-xl font-bold">
-            A
-          </div>
-
-          {open && (
-            <h1 className="text-2xl font-semibold tracking-wide">Admin Panel</h1>
-          )}
-        </div>
+       
 
         {/* MENU LIST */}
-        <div className="flex-1 flex flex-col mt-4 gap-2">
+        <nav className="flex flex-col gap-2 mt-6 px-4">
           {menus.map((menu, i) => {
             const active = location.pathname === menu.path;
 
             return (
-              <div key={i}>
-                <div
-                  onClick={() => navigate(menu.path)}
-                  className={`relative flex items-center gap-4 px-4 py-3 mx-3 rounded-xl cursor-pointer
-                    transition-all duration-200 ${
-                      active
-                        ? "bg-blue-800 text-white shadow-lg"
-                        : "text-blue-200 hover:bg-blue-900"
-                    }`}
-                >
-                  {active && (
-                    <div className="absolute left-0 h-full w-1 bg-blue-400 rounded-r-lg"></div>
-                  )}
-
-                  <span className="text-xl">{menu.icon}</span>
-
-                  {open && (
-                    <span className="text-sm font-medium tracking-wide">
-                      {menu.name}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <motion.button
+                key={i}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate(menu.path)}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                  transition-all duration-300
+                  ${
+                    active
+                      ? "bg-white/10 border shadow-lg"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  }
+                `}
+                style={{
+                  borderColor: active ? GOLD : "transparent",
+                  color: active ? GOLD : "",
+                }}
+              >
+                <span className="text-lg">{menu.icon}</span>
+                {!collapsed && <span>{menu.label}</span>}
+              </motion.button>
             );
           })}
-        </div>
+        </nav>
+
+        {/* LOGOUT BUTTON */}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={handleLogout}
+          className="
+            mt-auto flex items-center gap-3 
+            px-4 py-3 rounded-xl w-full transition-all
+            text-red-300 hover:text-red-400 hover:bg-red-500/10
+          "
+        >
+          <FaSignOutAlt />
+          {!collapsed && "Logout"}
+        </motion.button>
+      </motion.aside>
+
+      {/* MOBILE SIDEBAR */}
+      <motion.aside
+        initial={{ x: -260 }}
+        animate={{ x: isOpen ? 0 : -260 }}
+        transition={{ duration: 0.35 }}
+        className="
+          md:hidden fixed top-0 left-0
+          h-full w-64 z-[110]
+          bg-blue-950/95 backdrop-blur-xl shadow-2xl 
+          px-7 py-10 rounded-r-3xl
+        "
+      >
+        {/* CLOSE BUTTON */}
+        <button
+          onClick={toggleSidebar}
+          className="absolute top-4 right-4 text-white/80 hover:text-white text-xl"
+        >
+          ✕
+        </button>
+
+        {/* MENU LIST */}
+        <nav className="flex flex-col gap-3 mt-10">
+          {menus.map((menu, i) => {
+            const active = location.pathname === menu.path;
+
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  navigate(menu.path);
+                  toggleSidebar();
+                }}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all
+                  ${
+                    active
+                      ? "bg-white/10 border"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  }
+                `}
+                style={{
+                  borderColor: active ? GOLD : "transparent",
+                  color: active ? GOLD : "",
+                }}
+              >
+                <span className="text-lg">{menu.icon}</span>
+                {menu.label}
+              </button>
+            );
+          })}
+        </nav>
 
         {/* LOGOUT */}
-        <div className="mt-auto border-t border-blue-800 px-4 py-5">
-          <div
-            onClick={handleLogout}
-            className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer 
-              text-red-300 hover:text-red-400 hover:bg-red-900/20 transition-all"
-          >
-            <FaSignOutAlt className="text-xl" />
-            {open && <span className="text-sm font-medium">Logout</span>}
-          </div>
-        </div>
-      </motion.div>
+        <button
+          onClick={() => {
+            handleLogout();
+            toggleSidebar();
+          }}
+          className="
+            mt-auto pt-10 flex items-center gap-3
+            text-red-300 hover:text-red-400 hover:bg-red-500/10
+            px-4 py-3 rounded-xl w-full
+          "
+        >
+          <FaSignOutAlt />
+          Logout
+        </button>
+      </motion.aside>
+
+      {/* BACKDROP */}
+      {isOpen && (
+        <div
+          onClick={toggleSidebar}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm md:hidden z-[100]"
+        ></div>
+      )}
     </>
   );
 };
