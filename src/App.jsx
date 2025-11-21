@@ -1,10 +1,23 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+
 import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
+
+// PRODUCT PAGES
 import AddProduct from "./pages/products/AddProduct";
 import AllProducts from "./pages/products/AllProducts";
 import EditProduct from "./pages/products/EditProduct";
 import ProductDetailsView from "./pages/products/ProductDetailsView";
+
+// NEW MODULE PAGES
+import PaymentsPage from "./pages/payments/PaymentsPage";
+import BuyNowOrders from "./pages/buynow/BuyNowOrders";
+import NewsletterPage from "./pages/newsletter/NewsletterPage";
+
+// 📌 Newly Added Pages
+import OrdersPage from "./pages/orders/OrdersPage";
+import CustomersPage from "./pages/customers/CustomersPage";
+
 import Logout from "./Logout";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
@@ -29,7 +42,6 @@ function Layout({ children }) {
   return (
     <div className="flex">
       {!hideLayout && <Sidebar />}
-
       <div className={`flex-1 p-2 ${hideLayout ? "" : "ml-[40px]"}`}>
         {!hideLayout && <Navbar />}
         {children}
@@ -94,12 +106,62 @@ function App() {
             }
           />
 
-          {/* PRODUCT DETAILS — FIXED */}
+          {/* PRODUCT DETAILS */}
           <Route
             path="/admin/products/view/:id"
             element={
               <PrivateRoute>
                 <ProductDetailsView />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ⭐ PAYMENTS PAGE */}
+          <Route
+            path="/admin/payments"
+            element={
+              <PrivateRoute>
+                <PaymentsPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ⭐ BUY NOW ORDERS PAGE */}
+          <Route
+            path="/admin/buynow-orders"
+            element={
+              <PrivateRoute>
+                <BuyNowOrders />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ⭐ NEWSLETTER PAGE */}
+          <Route
+            path="/admin/newsletter"
+            element={
+              <PrivateRoute>
+                <NewsletterPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ⭐ ORDERS PAGE */}
+          <Route
+            path="/admin/orders"
+            element={
+              <PrivateRoute>
+                <OrdersPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ⭐ CUSTOMERS PAGE */}
+          <Route
+            path="/admin/customers"
+            element={
+              <PrivateRoute>
+                <CustomersPage />
               </PrivateRoute>
             }
           />

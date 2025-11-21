@@ -5,8 +5,10 @@ import {
   FaShoppingCart,
   FaUsers,
   FaChartBar,
-  FaSignOutAlt,
-  FaChevronLeft,
+  FaMoneyCheckAlt,
+  FaBolt,
+  FaEnvelopeOpenText,
+  FaSignOutAlt      // ✅ FIXED: Added missing import
 } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -23,7 +25,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { label: "Products", icon: <FaBoxOpen />, path: "/admin/products/all" },
     { label: "Orders", icon: <FaShoppingCart />, path: "/admin/orders" },
     { label: "Customers", icon: <FaUsers />, path: "/admin/customers" },
-    { label: "Reports", icon: <FaChartBar />, path: "/admin/reports" },
+    { label: "Payments", icon: <FaMoneyCheckAlt />, path: "/admin/payments" },
+    { label: "Buy Now", icon: <FaBolt />, path: "/admin/buynow-orders" },
+    { label: "Newsletter", icon: <FaEnvelopeOpenText />, path: "/admin/newsletter" },
   ];
 
   const handleLogout = () => {
@@ -47,7 +51,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           transition-all duration-300
         "
       >
-       
+        
 
         {/* MENU LIST */}
         <nav className="flex flex-col gap-2 mt-6 px-4">
