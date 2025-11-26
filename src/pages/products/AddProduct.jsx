@@ -1,542 +1,923 @@
 // src/pages/products/AddProduct.jsx
-import React, { useEffect, useState } from "react";
-import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { HexColorPicker } from "react-colorful";
-import AdminLayout from "../../components/AdminLayout";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import AdminLayout from "../../components/AdminLayout";
 import { motion } from "framer-motion";
+import { FaCheck, FaUpload, FaTrash, FaImage, FaPalette, FaCalendarAlt } from "react-icons/fa";
+import { HexColorPicker } from "react-colorful";
+import DatePicker from "react-datepicker";
+import { useNavigate } from "react-router-dom";
+import "react-datepicker/dist/react-datepicker.css";
 
-const API_BASE = "https://ecommerce-backend-y1bv.onrender.com/api/product";
+/**
+ * NOTE: removed sandbox:/... preview (invalid in browser).
+ * Use an external placeholder that will always resolve in dev.
+ */
+const UPLOADED_PREVIEW = "https://via.placeholder.com/600x400?text=No+Image";
 
-const sizeOptions = [
-  { value: "XS", label: "XS" },
-  { value: "S", label: "S" },
-  { value: "M", label: "M" },
-  { value: "L", label: "L" },
-  { value: "XL", label: "XL" },
-  { value: "XXL", label: "XXL" },
-];
+const API_BASE = "https://ecommerce-backend-y1bv.onrender.com/api/product/";
 
-const inputBox =
-  "p-3 rounded-xl border border-gray-300 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none";
+/* ------------------ Helpers to normalize API responses ------------------ */
+const normalizeCategoriesPayload = (payload) => {
+  let arr = Array.isArray(payload) ? payload : payload?.categories ?? payload?.data ?? [];
+  return arr
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === "string") return { id: item, label: item };
+      if (typeof item === "object") {
+        const label = item.category ?? item.name ?? item.title ?? item.label;
+        if (label) return { id: String(label), label: String(label) };
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
 
-const AddProduct = ({ initialData = null, onSaved = () => {}, closeModal = () => {} }) => {
-  const [categories, setCategories] = useState([]);
-  const [subcategoriesForSelected, setSubcategoriesForSelected] = useState([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+const normalizeSubcategoriesPayload = (payload) => {
+  let arr = Array.isArray(payload) ? payload : payload?.subcategories ?? payload?.data ?? [];
+  return arr
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === "string") return { id: item, label: item };
+      if (typeof item === "object") {
+        const label = item.subCategory ?? item.name ?? item.label ?? item.title;
+        if (label) return { id: String(label), label: String(label) };
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
 
-  const [product, setProduct] = useState({
-    name: "",
-    brand: "",
-    model: "",
-    description: "",
-    basePrice: "",
-    mrp: "",
-    discountPercentage: 0,
-    currency: "INR",
-    availability: "In Stock",
-    category: "",
-    subCategory: "",
-    subSubCategory: "",
-    sizes: [],
-    warranty: { type: "", duration: "" },
-    shipping: {
-      weight: "",
-      dimensions: { length: "", width: "", height: "", unit: "cm" },
-      deliveryTime: "",
-      returnPolicy: "",
-      shippingCharge: 0,
-    },
-    stock: 0,
-    isMain: false,
-    variants: [], // array of variant object ids (strings)
-    reviews: [], // not set here
-    share: {},
-    views: 0,
-    images: [], // existing image URLs (for edit)
-    imageFiles: [], // File objects for upload
-    videos: [], // existing video URLs
-    videoFiles: [], // File objects for upload
-    expiryDate: null,
-    color: "#3b82f6",
-  });
+const normalizeProductsPayload = (payload) => {
+  let arr = Array.isArray(payload) ? payload : payload?.products ?? payload?.data ?? [];
+  return arr
+    .map((p) => {
+      if (!p) return null;
+      const name = p.name ?? p.title ?? p.latestProductName ?? p.productName;
+      const subSub = p.subSubCategory ?? p.subSub ?? p.subCategory ?? name;
+      const id = p._id ?? p.id ?? name;
+      return { id: String(id), name: String(name ?? subSub ?? id), raw: p, subSub: String(subSub ?? name ?? id) };
+    })
+    .filter(Boolean);
+};
 
-  // Local UI state for previews & file inputs
-  const [imagePreviews, setImagePreviews] = useState([]); // urls
-  const [videoPreviews, setVideoPreviews] = useState([]); // urls
-  const [customSize, setCustomSize] = useState("");
+/* ------------------ Small presentational components ------------------ */
 
-  // Fetch categories (assume endpoint returns { categories: [{category, subcategories: []}, ...] })
-  const fetchCategories = async () => {
-    try {
-      setLoadingCategories(true);
-      const res = await axios.get(`${API_BASE}/categories`);
-      const cats = Array.isArray(res?.data?.categories) ? res.data.categories : [];
-      setCategories(
-        cats.map((c) => ({
-          value: c.category,
-          label: c.category,
-          subcategories: Array.isArray(c.subcategories) ? c.subcategories : [],
-        }))
-      );
-    } catch (err) {
-      console.error("Failed to load categories:", err);
-      setCategories([]);
-    } finally {
-      setLoadingCategories(false);
-    }
-  };
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-2xl shadow-md border ${className}`}>{children}</div>
+);
+
+const SectionHeader = ({ title, subtitle, color = "from-indigo-500 to-purple-600" }) => (
+  <div className="flex items-center gap-4 mb-4">
+    <div className={`w-1.5 h-10 rounded-md bg-gradient-to-b ${color}`} />
+    <div>
+      <div className="text-lg font-semibold text-gray-800">{title}</div>
+      {subtitle && <div className="text-sm text-gray-500">{subtitle}</div>}
+    </div>
+  </div>
+);
+
+const Label = ({ children }) => <label className="block text-sm font-medium text-gray-700 mb-2">{children}</label>;
+
+const Input = (props) => (
+  <input
+    {...props}
+    className={`w-full border border-gray-200 rounded-xl px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 ${props.className || ""}`}
+  />
+);
+
+const Textarea = (props) => (
+  <textarea
+    {...props}
+    className={`w-full border border-gray-200 rounded-xl px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 ${props.className || ""}`}
+  />
+);
+
+/* ------------------ SizeSelector Component ------------------ */
+function SizeSelector({ mode, selectedSizes, onToggle }) {
+  const shoeSizes = ["5", "6", "7", "8", "9", "10", "11", "12"];
+  const clothingSizes = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+
+  const base = "w-14 h-12 flex items-center justify-center rounded-lg border text-sm font-semibold cursor-pointer select-none transition-all";
+  const selectedClass = "bg-amber-500 text-white border-amber-600 shadow-lg";
+  const unselectedClass = "bg-white text-gray-700 border-gray-200 hover:scale-[1.03]";
+
+  if (mode === "shoes") {
+    return (
+      <>
+        <div className="text-sm text-gray-500 mb-3">Tap to select one or more shoe sizes</div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {shoeSizes.map((s) => {
+            const sel = selectedSizes.includes(s);
+            return (
+              <motion.button
+                key={s}
+                type="button"
+                onClick={() => onToggle(s)}
+                whileTap={{ scale: 0.96 }}
+                className={`${base} ${sel ? selectedClass : unselectedClass}`}
+                aria-pressed={sel}
+              >
+                <span>{s}</span>
+                {sel && <FaCheck className="ml-2 w-3 h-3" />}
+              </motion.button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  if (mode === "clothing") {
+    return (
+      <>
+        <div className="text-sm text-gray-500 mb-3">Tap to select one or more clothing sizes</div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {clothingSizes.map((s) => {
+            const sel = selectedSizes.includes(s);
+            return (
+              <motion.button
+                key={s}
+                type="button"
+                onClick={() => onToggle(s)}
+                whileTap={{ scale: 0.96 }}
+                className={`${base} ${sel ? selectedClass : unselectedClass}`}
+                aria-pressed={sel}
+              >
+                <span>{s}</span>
+                {sel && <FaCheck className="ml-2 w-3 h-3" />}
+              </motion.button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  // other
+  return (
+    <>
+      <div className="text-sm text-gray-500 mb-3">Enter sizes as comma separated values (e.g. 32, 34, Free Size)</div>
+      <Input placeholder="Sizes (comma separated)" onChange={(e) => onToggle(e.target.value)} />
+    </>
+  );
+}
+
+/* ------------------ MediaUploader Component (URLs + Files + previews) ------------------ */
+function MediaUploader({ images, setImages, videos, onVideosChange }) {
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    fetchCategories();
+    // cleanup object URLs on unmount
+    return () => {
+      images.forEach((it) => {
+        if (it.url && it.file) {
+          try {
+            URL.revokeObjectURL(it.url);
+          } catch {}
+        }
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If initialData provided (edit mode), populate form
-  useEffect(() => {
-    if (!initialData) return;
-    setProduct((prev) => ({
-      ...prev,
-      name: initialData.name ?? prev.name,
-      brand: initialData.brand ?? prev.brand,
-      model: initialData.model ?? prev.model,
-      description: initialData.description ?? prev.description,
-      basePrice: initialData.basePrice ?? prev.basePrice,
-      mrp: initialData.mrp ?? prev.mrp,
-      discountPercentage: initialData.discountPercentage ?? prev.discountPercentage,
-      currency: initialData.currency ?? prev.currency,
-      availability: initialData.availability ?? prev.availability,
-      category: initialData.category ?? prev.category,
-      subCategory: initialData.subCategory ?? prev.subCategory,
-      subSubCategory: initialData.subSubCategory ?? prev.subSubCategory,
-      sizes: Array.isArray(initialData.sizes) ? initialData.sizes : prev.sizes,
-      warranty: initialData.warranty ?? prev.warranty,
-      shipping: initialData.shipping ?? prev.shipping,
-      stock: initialData.stock ?? prev.stock,
-      isMain: initialData.isMain ?? prev.isMain,
-      variants: Array.isArray(initialData.variants) ? initialData.variants : prev.variants,
-      images: Array.isArray(initialData.images) ? initialData.images : [],
-      videos: Array.isArray(initialData.videos) ? initialData.videos : [],
-      expiryDate: initialData.expiryDate ? new Date(initialData.expiryDate) : prev.expiryDate,
-      color: initialData.color ?? prev.color,
-      views: initialData.views ?? prev.views,
-    }));
-
-    // initial previews
-    setImagePreviews(Array.isArray(initialData.images) ? initialData.images : []);
-    setVideoPreviews(Array.isArray(initialData.videos) ? initialData.videos : []);
-  }, [initialData]);
-
-  // Update subcategories when category changes
-  useEffect(() => {
-    const selected = categories.find((c) => c.value === product.category);
-    setSubcategoriesForSelected(selected?.subcategories ?? []);
-    // if current subCategory not present in new list, clear it
-    if (product.subCategory && !selected?.subcategories?.includes(product.subCategory)) {
-      setProduct((p) => ({ ...p, subCategory: "", subSubCategory: "" }));
-    }
-  }, [product.category, categories]);
-
-  // Generic change for top-level fields
-  const setField = (key, value) => {
-    setProduct((p) => ({ ...p, [key]: value }));
-  };
-
-  // Nested updates
-  const setWarrantyField = (key, value) => {
-    setProduct((p) => ({ ...p, warranty: { ...p.warranty, [key]: value } }));
-  };
-  const setShippingField = (key, value) => {
-    setProduct((p) => ({ ...p, shipping: { ...p.shipping, [key]: value } }));
-  };
-  const setShippingDimension = (key, value) => {
-    setProduct((p) => ({ ...p, shipping: { ...p.shipping, dimensions: { ...p.shipping.dimensions, [key]: value } } }));
-  };
-
-  // Handle selecting multiple image files
-  const handleImagesChange = (e) => {
+  const onFilesSelected = (e) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    // append to existing imageFiles
-    setProduct((p) => ({ ...p, imageFiles: [...(p.imageFiles || []), ...files] }));
-    // previews
-    const urls = files.map((f) => URL.createObjectURL(f));
-    setImagePreviews((prev) => [...prev, ...urls]);
+    const newItems = files.map((f) => ({ id: `${Date.now()}-${f.name}`, file: f, url: URL.createObjectURL(f) }));
+    setImages((prev) => [...prev, ...newItems]);
+    e.target.value = null;
   };
 
-  // Remove preview image at index (also remove corresponding file if present)
-  const removeImageAt = (index) => {
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    setProduct((p) => {
-      const newFiles = (p.imageFiles || []).slice();
-      if (index < newFiles.length) {
-        newFiles.splice(index, 1);
+  const onAddUrl = (val) => {
+    const urls = val.split(",").map((s) => s.trim()).filter(Boolean);
+    const newItems = urls.map((u) => ({ id: `url-${Date.now()}-${Math.random()}`, url: u }));
+    setImages((prev) => [...prev, ...newItems]);
+  };
+
+  const removeImage = (id) => {
+    setImages((prev) => {
+      const it = prev.find((x) => x.id === id);
+      if (it && it.file && it.url) {
+        try {
+          URL.revokeObjectURL(it.url);
+        } catch {}
       }
-      // If initial images were present and previews include them, handle deletion by removing from p.images as well
-      const newExisting = (p.images || []).slice();
-      if (index >= (p.imageFiles || []).length && index - (p.imageFiles || []).length < newExisting.length) {
-        newExisting.splice(index - (p.imageFiles || []).length, 1);
-      }
-      return { ...p, imageFiles: newFiles, images: newExisting };
+      return prev.filter((it) => it.id !== id);
     });
-  };
-
-  // Videos
-  const handleVideosChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setProduct((p) => ({ ...p, videoFiles: [...(p.videoFiles || []), ...files] }));
-    const urls = files.map((f) => URL.createObjectURL(f));
-    setVideoPreviews((prev) => [...prev, ...urls]);
-  };
-  const removeVideoAt = (index) => {
-    setVideoPreviews((prev) => prev.filter((_, i) => i !== index));
-    setProduct((p) => {
-      const newFiles = (p.videoFiles || []).slice();
-      if (index < newFiles.length) newFiles.splice(index, 1);
-      const newExisting = (p.videos || []).slice();
-      if (index >= (p.videoFiles || []).length && index - (p.videoFiles || []).length < newExisting.length) {
-        newExisting.splice(index - (p.videoFiles || []).length, 1);
-      }
-      return { ...p, videoFiles: newFiles, videos: newExisting };
-    });
-  };
-
-  // Add custom size
-  const addCustomSize = () => {
-    if (!customSize || product.sizes.includes(customSize)) return;
-    setProduct((p) => ({ ...p, sizes: [...p.sizes, customSize] }));
-    setCustomSize("");
-  };
-
-  // Remove size
-  const removeSize = (s) => {
-    setProduct((p) => ({ ...p, sizes: p.sizes.filter((x) => x !== s) }));
-  };
-
-  // Save handler - sends multipart form-data
-  const handleSave = async () => {
-    try {
-      const fd = new FormData();
-
-      // Primitive fields
-      fd.append("name", product.name);
-      fd.append("brand", product.brand);
-      fd.append("model", product.model);
-      fd.append("description", product.description || "");
-      fd.append("basePrice", String(product.basePrice ?? ""));
-      fd.append("mrp", String(product.mrp ?? ""));
-      fd.append("discountPercentage", String(product.discountPercentage ?? 0));
-      fd.append("currency", product.currency || "INR");
-      fd.append("availability", product.availability || "In Stock");
-      fd.append("category", product.category || "");
-      fd.append("subCategory", product.subCategory || "");
-      fd.append("subSubCategory", product.subSubCategory || "");
-      fd.append("stock", String(product.stock ?? 0));
-      fd.append("isMain", product.isMain ? "true" : "false");
-      fd.append("views", String(product.views ?? 0));
-      if (product.expiryDate) fd.append("expiryDate", product.expiryDate.toISOString());
-      fd.append("color", product.color || "#3b82f6");
-
-      // arrays / nested - sizes as JSON string
-      fd.append("sizes", JSON.stringify(product.sizes || []));
-      fd.append("variants", JSON.stringify(product.variants || []));
-
-      // warranty and shipping as JSON (backend should parse)
-      fd.append("warranty", JSON.stringify(product.warranty || {}));
-      fd.append("shipping", JSON.stringify(product.shipping || {}));
-
-      // existing image URLs (if editing) - send as JSON so backend can keep them
-      if (product.images && product.images.length > 0) {
-        fd.append("existingImages", JSON.stringify(product.images));
-      }
-      if (product.videos && product.videos.length > 0) {
-        fd.append("existingVideos", JSON.stringify(product.videos));
-      }
-
-      // append new image files
-      if (product.imageFiles && product.imageFiles.length > 0) {
-        product.imageFiles.forEach((file) => {
-          fd.append("images", file);
-        });
-      }
-
-      // append new video files
-      if (product.videoFiles && product.videoFiles.length > 0) {
-        product.videoFiles.forEach((file) => {
-          fd.append("videos", file);
-        });
-      }
-
-      // POST or PUT
-      let res;
-      if (initialData && initialData._id) {
-        res = await axios.put(`${API_BASE}/${initialData._id}`, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } else {
-        res = await axios.post(API_BASE, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      }
-
-      // success; pass saved product to parent if desired
-      onSaved(res?.data ?? null);
-    } catch (err) {
-      console.error("Error saving product:", err.response?.data || err.message);
-      alert("Failed to save product. See console for details.");
-    }
   };
 
   return (
-     <AdminLayout>
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full flex justify-center p-4 sm:p-6 ">
-      <div className="bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-3xl w-full max-w-6xl p-8 mt-16">
+    <div className="space-y-3">
+      <Label>Images</Label>
 
-        <h2 className="text-3xl sm:text-4xl font-bold text-[#0A1A3A] text-center mb-8">
-          {initialData ? "Update Product" : "Add New Product"}
-        </h2>
+      <div className="flex gap-3 items-start flex-col md:flex-row">
+        <div className="flex-1 space-y-3">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 rounded-lg border flex items-center gap-2 bg-gradient-to-r from-rose-500 to-rose-400 text-white"
+            >
+              <FaUpload /> Upload
+            </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onFilesSelected}
+              className="hidden"
+            />
 
-          {/* LEFT COLUMN */}
-          <div className="space-y-4">
+            <label className="flex-1">
+              <Input placeholder="Paste image URLs (comma separated)" onBlur={(e) => onAddUrl(e.target.value)} />
+              <div className="text-xs text-gray-400 mt-1">Paste several URLs then click outside input.</div>
+            </label>
+          </div>
 
-            {/* Name */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Product Name</label>
-              <input type="text" className={inputBox} value={product.name} onChange={(e) => setField("name", e.target.value)} placeholder="Enter product name" />
-            </div>
+          <div className="text-xs text-gray-500">Supported: JPG, PNG. Upload multiple images for gallery.</div>
+        </div>
 
-            {/* Brand */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Brand</label>
-              <input type="text" className={inputBox} value={product.brand} onChange={(e) => setField("brand", e.target.value)} placeholder="Brand (optional)" />
-            </div>
-
-            {/* Model */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Model</label>
-              <input type="text" className={inputBox} value={product.model} onChange={(e) => setField("model", e.target.value)} placeholder="Model (optional)" />
-            </div>
-
-            {/* Description */}
-            <div className="md:col-span-2">
-              <label className="font-semibold text-gray-700 mb-2 block">Description</label>
-              <textarea className={`${inputBox} min-h-[120px]`} value={product.description} onChange={(e) => setField("description", e.target.value)} placeholder="Detailed description" />
-            </div>
-
-            {/* Prices: basePrice, mrp, discount */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Base Price (₹)</label>
-                <input type="number" className={inputBox} value={product.basePrice} onChange={(e) => setField("basePrice", e.target.value)} />
+        <div className="w-full md:w-48">
+          <div className="grid grid-cols-2 gap-2">
+            {images.length ? (
+              images.slice(0, 4).map((it) => (
+                <div key={it.id} className="relative w-full h-20 rounded-lg overflow-hidden border">
+                  <img src={it.url} alt="preview" className="object-cover w-full h-full" />
+                  <button type="button" onClick={() => removeImage(it.id)} className="absolute top-1 right-1 bg-white rounded p-1 text-sm">
+                    <FaTrash />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-2 h-20 rounded-lg border flex items-center justify-center text-gray-300">
+                <FaImage className="text-2xl" />
               </div>
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">MRP (₹)</label>
-                <input type="number" className={inputBox} value={product.mrp} onChange={(e) => setField("mrp", e.target.value)} />
-              </div>
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Discount %</label>
-                <input type="number" className={inputBox} value={product.discountPercentage} onChange={(e) => setField("discountPercentage", e.target.value)} />
-              </div>
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
 
-            {/* currency & availability */}
-            <div className="grid grid-cols-2 gap-3">
+      <Label>Videos</Label>
+      <Input placeholder="Video URLs (comma separated)" onChange={(e) => onVideosChange(e.target.value)} />
+    </div>
+  );
+}
+
+/* ------------------ ShippingSection Component ------------------ */
+function ShippingSection({ shipping, onChange, onDimensionChange }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div>
+        <Label>Weight (kg)</Label>
+        <Input name="weight" value={shipping.weight} onChange={onChange} />
+      </div>
+      <div>
+        <Label>Length (cm)</Label>
+        <Input name="length" value={shipping.dimensions.length} onChange={onDimensionChange} />
+      </div>
+      <div>
+        <Label>Width (cm)</Label>
+        <Input name="width" value={shipping.dimensions.width} onChange={onDimensionChange} />
+      </div>
+      <div>
+        <Label>Height (cm)</Label>
+        <Input name="height" value={shipping.dimensions.height} onChange={onDimensionChange} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------ Main Page ------------------ */
+
+const INITIAL_PRODUCT = {
+  name: "",
+  brand: "",
+  model: "",
+  description: "",
+  basePrice: "",
+  mrp: "",
+  discountPercentage: 0,
+  currency: "INR",
+  availability: "In Stock",
+  category: "",
+  subCategory: "",
+  subSubCategory: "",
+  sizes: [],
+  stockPerSize: {},
+  warranty: { type: "", duration: "" },
+  shipping: {
+    weight: "",
+    dimensions: { length: "", width: "", height: "", unit: "cm" },
+    deliveryTime: "",
+    returnPolicy: "",
+    shippingCharge: "",
+  },
+  stock: "",
+  isMain: true,
+  images: [],
+  videos: [],
+};
+
+export default function AddProduct() {
+  const navigate = useNavigate();
+
+  const [categories, setCategories] = useState([]); // {id,label}
+  const [subCategories, setSubCategories] = useState([]); // {id,label}
+  const [subSubCategories, setSubSubCategories] = useState([]); // strings
+
+  const [loading, setLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+
+  const [images, setImages] = useState([]); // array of {id, url?, file?}
+  const [videos, setVideos] = useState([]); // array of video urls
+  const [colors, setColors] = useState([]); // list of hex strings
+  const [currentColor, setCurrentColor] = useState("#f43f5e");
+  const [launchDate, setLaunchDate] = useState(null);
+
+  // sizeMode can be 'shoes', 'clothing', or 'other'
+  const [sizeMode, setSizeMode] = useState("other");
+
+  const [product, setProduct] = useState(INITIAL_PRODUCT);
+
+  /* ------------------ fetch categories ------------------ */
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    axios
+      .get(`${API_BASE}/categories`)
+      .then((res) => {
+        if (!mounted) return;
+        const data = res.data ?? res;
+        const cats = normalizeCategoriesPayload(data);
+        setCategories(cats);
+      })
+      .catch((err) => {
+        console.error("Error fetching categories:", err);
+        setCategories([]);
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, []);
+
+  /* ------------------ fetch subcategories when category changes ------------------ */
+  useEffect(() => {
+    if (!product.category) {
+      setSubCategories([]);
+      setSubSubCategories([]);
+      return;
+    }
+    let mounted = true;
+    setLoading(true);
+    axios
+      .get(`${API_BASE}/categories/${encodeURIComponent(product.category)}/subcategories`)
+      .then((res) => {
+        if (!mounted) return;
+        const data = res.data ?? res;
+        const subs = normalizeSubcategoriesPayload(data);
+        setSubCategories(subs);
+        setSubSubCategories([]);
+      })
+      .catch((err) => {
+        console.error("Error fetching subcategories:", err);
+        setSubCategories([]);
+        setSubSubCategories([]);
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, [product.category]);
+
+  /* ------------------ fetch sub-sub (products) when subCategory changes ------------------ */
+  useEffect(() => {
+    if (!product.category || !product.subCategory) {
+      setSubSubCategories([]);
+      return;
+    }
+    let mounted = true;
+    setLoading(true);
+    axios
+      .get(`${API_BASE}/categories/${encodeURIComponent(product.category)}/${encodeURIComponent(product.subCategory)}/products`)
+      .then((res) => {
+        if (!mounted) return;
+        const data = res.data ?? res;
+        const products = normalizeProductsPayload(data);
+        // extract unique subSub labels
+        const extracted = products
+          .map((p) => (p.raw && (p.raw.subSubCategory ?? p.raw.subSub ?? p.raw.latestProductName)) || p.subSub || p.name)
+          .filter(Boolean)
+          .map((s) => String(s));
+        setSubSubCategories(Array.from(new Set(extracted)));
+      })
+      .catch((err) => {
+        console.error("Error fetching products/sub-subcategories:", err);
+        setSubSubCategories([]);
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, [product.subCategory, product.category]);
+
+  /* ------------------ Auto-switch size mode based on subCategory ------------------ */
+  useEffect(() => {
+    const sub = (product.subCategory || "").toLowerCase();
+    const subsub = (product.subSubCategory || "").toLowerCase();
+
+    if (
+      sub.includes("shoe") ||
+      sub.includes("footwear") ||
+      sub.includes("sandal") ||
+      subsub.includes("shoe") ||
+      subsub.includes("footwear") ||
+      subsub.includes("sandal")
+    ) {
+      setSizeMode("shoes");
+    } else if (sub) {
+      setSizeMode("clothing");
+    } else {
+      setSizeMode("other");
+    }
+  }, [product.subCategory, product.subSubCategory]);
+
+  /* ------------------ input handlers ------------------ */
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    if (type === "checkbox") {
+      setProduct((p) => ({ ...p, [name]: checked }));
+      return;
+    }
+    // reset sizes when changing category/sub to avoid incorrect sizes
+    setProduct((p) => ({ ...p, [name]: value, sizes: name === "category" || name === "subCategory" || name === "subSubCategory" ? [] : p.sizes }));
+  };
+
+  const handleShippingChange = (e) => {
+    const { name, value } = e.target;
+    setProduct((p) => ({ ...p, shipping: { ...p.shipping, [name]: value } }));
+  };
+
+  const handleDimensionChange = (e) => {
+    const { name, value } = e.target;
+    setProduct((p) => ({ ...p, shipping: { ...p.shipping, dimensions: { ...p.shipping.dimensions, [name]: value } } }));
+  };
+
+  const handleVideosChange = (v) => {
+    setVideos(v.split(",").map((s) => s.trim()).filter(Boolean));
+  };
+
+  const handleMediaChangeUrls = (value, field) => {
+    setProduct((p) => ({ ...p, [field]: value.split(",").map((s) => s.trim()).filter(Boolean) }));
+  };
+
+  const addColor = () => {
+    if (!colors.includes(currentColor)) {
+      setColors((c) => [...c, currentColor]);
+    }
+  };
+
+  const removeColor = (hex) => setColors((c) => c.filter((x) => x !== hex));
+
+  const toggleSize = (sizeOrValue) => {
+    if (typeof sizeOrValue === "string" && sizeOrValue.includes(",")) {
+      const arr = sizeOrValue.split(",").map((s) => s.trim()).filter(Boolean);
+      setProduct((p) => ({ ...p, sizes: arr, stockPerSize: {} }));
+      return;
+    }
+    setProduct((p) => {
+      const exists = p.sizes.includes(sizeOrValue);
+      const sizes = exists ? p.sizes.filter((s) => s !== sizeOrValue) : [...p.sizes, sizeOrValue];
+      const newStock = { ...p.stockPerSize };
+      if (exists) delete newStock[sizeOrValue];
+      return { ...p, sizes, stockPerSize: newStock };
+    });
+  };
+
+  const setStockForSize = (size, qty) => {
+    setProduct((p) => ({ ...p, stockPerSize: { ...p.stockPerSize, [size]: Number(qty || 0) } }));
+  };
+
+  /* ------------------ Media helpers for main file state ------------------ */
+  // sync URL-only images to product.images so preview uses them
+  useEffect(() => {
+    const urlOnly = images.filter((it) => it.url && !it.file).map((it) => it.url);
+    setProduct((p) => ({ ...p, images: urlOnly }));
+  }, [images]);
+
+  // cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      images.forEach((it) => {
+        if (it.file && it.url) {
+          try {
+            URL.revokeObjectURL(it.url);
+          } catch {}
+        }
+      });
+    };
+  }, [images]);
+
+  /* ------------------ submit ------------------ */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitLoading(true);
+    try {
+      const fd = new FormData();
+      const payload = { ...product };
+
+      payload.basePrice = payload.basePrice === "" ? 0 : Number(payload.basePrice);
+      payload.mrp = payload.mrp === "" ? 0 : Number(payload.mrp);
+      payload.stock = payload.stock === "" ? 0 : Number(payload.stock);
+
+      payload.colors = colors;
+      payload.videos = videos;
+      payload.launchDate = launchDate ? launchDate.toISOString() : null;
+
+      // include remote URLs (not new uploads)
+      payload.images = images.filter((it) => it.url && !it.file).map((it) => it.url);
+
+      // Append payload fields: objects become JSON strings, arrays JSON string
+      Object.keys(payload).forEach((k) => {
+        const val = payload[k];
+        if (val === undefined || val === null) return;
+        if (typeof val === "object" && !Array.isArray(val)) {
+          fd.append(k, JSON.stringify(val));
+        } else if (Array.isArray(val)) {
+          fd.append(k, JSON.stringify(val));
+        } else {
+          fd.append(k, String(val));
+        }
+      });
+
+      // explicit fields
+      fd.set("stockPerSize", JSON.stringify(product.stockPerSize || {}));
+      fd.set("colors", JSON.stringify(colors || []));
+      fd.set("videos", JSON.stringify(videos || []));
+
+      // append file images as imageFiles (backend should accept array of files)
+      images.forEach((it) => {
+        if (it.file) fd.append("imageFiles", it.file);
+      });
+
+      const res = await axios.post(`${API_BASE}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setSubmitLoading(false);
+      alert("Product added successfully");
+      console.log("Add response:", res.data);
+
+      // revoke any created object URLs
+      images.forEach((it) => {
+        if (it.file && it.url) {
+          try {
+            URL.revokeObjectURL(it.url);
+          } catch {}
+        }
+      });
+
+      // reset entire form
+      setProduct(INITIAL_PRODUCT);
+      setImages([]);
+      setVideos([]);
+      setColors([]);
+      setLaunchDate(null);
+
+      // navigate to all products page
+      navigate("/admin/products/all");
+    } catch (err) {
+      setSubmitLoading(false);
+      console.error("Error adding product:", err);
+      // Show server-provided message when available
+      const msg = err?.response?.data?.message || err?.message || "Error adding product";
+      alert(msg);
+    }
+  };
+
+  /* ------------------ UI ------------------ */
+  return (
+    <AdminLayout>
+      {/* BACK BUTTON */}
+      <div className="p-4">
+        <button
+          onClick={() => navigate("/admin/products/all")}
+          className="px-4 py-2 rounded-lg font-medium shadow transition"
+          style={{
+            backgroundColor: "#0A1A3A",
+            color: "#FFFFFF",
+          }}
+        >
+          ← Back to Products
+        </button>
+      </div>
+
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Add New Product</h1>
+            <p className="text-sm text-gray-500 mt-1">E-commerce premium UI — colorful, responsive, and feature-rich.</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600">Status</div>
+            <div className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-sm font-semibold">Draft</div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* BASIC */}
+          <Card className="p-6">
+            <SectionHeader title="Basic Information" subtitle="Product name, brand, pricing & availability" color="from-rose-500 to-rose-400" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Currency</label>
-                <input type="text" className={inputBox} value={product.currency} onChange={(e) => setField("currency", e.target.value)} />
+                <Label>Product Name</Label>
+                <Input name="name" value={product.name} onChange={handleChange} required placeholder="e.g. Running Sneakers" />
               </div>
+
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Availability</label>
-                <select className={inputBox} value={product.availability} onChange={(e) => setField("availability", e.target.value)}>
+                <Label>Brand</Label>
+                <Input name="brand" value={product.brand} onChange={handleChange} placeholder="Brand name (optional)" />
+              </div>
+
+              <div>
+                <Label>Model</Label>
+                <Input name="model" value={product.model} onChange={handleChange} placeholder="Model number / code" />
+              </div>
+
+              <div>
+                <Label>Currency</Label>
+                <Input name="currency" value={product.currency} onChange={handleChange} placeholder="INR" />
+              </div>
+
+              <div>
+                <Label>Base Price</Label>
+                <Input name="basePrice" type="number" min="0" value={product.basePrice} onChange={handleChange} placeholder="0.00" />
+              </div>
+
+              <div>
+                <Label>MRP</Label>
+                <Input name="mrp" type="number" min="0" value={product.mrp} onChange={handleChange} placeholder="0.00" />
+              </div>
+
+              <div>
+                <Label>Discount %</Label>
+                <Input name="discountPercentage" type="number" min="0" max="100" value={product.discountPercentage} onChange={handleChange} placeholder="0" />
+              </div>
+
+              <div>
+                <Label>Availability</Label>
+                <select name="availability" value={product.availability} onChange={handleChange} className="w-full p-2 border rounded-xl">
                   <option>In Stock</option>
                   <option>Out of Stock</option>
                   <option>Preorder</option>
-                  <option>Backorder</option>
                 </select>
               </div>
-            </div>
 
-            {/* Stock & isMain */}
-            <div className="grid grid-cols-2 gap-3 items-end">
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Stock</label>
-                <input type="number" className={inputBox} value={product.stock} onChange={(e) => setField("stock", e.target.value)} />
+              <div className="md:col-span-2">
+                <Label>Description</Label>
+                <Textarea name="description" rows={3} value={product.description} onChange={handleChange} placeholder="Short product description..." />
               </div>
 
               <div>
-                <label className="inline-flex items-center gap-2 mt-4">
-                  <input type="checkbox" checked={product.isMain} onChange={(e) => setField("isMain", e.target.checked)} className="h-4 w-4" />
-                  <span className="text-sm text-gray-700">Mark as Featured</span>
-                </label>
+                <Label><FaCalendarAlt className="inline mr-2 text-rose-500" /> Launch / Available From</Label>
+                <div>
+                  <DatePicker selected={launchDate} onChange={(date) => setLaunchDate(date)} className="w-full p-2 border rounded-xl" placeholderText="Select date" />
+                </div>
+              </div>
+
+              <div>
+                <Label>Featured (Main Product)</Label>
+                <div className="flex items-center gap-2">
+                  <input name="isMain" type="checkbox" checked={product.isMain} onChange={handleChange} className="w-4 h-4" />
+                  <div className="text-sm">Mark as featured</div>
+                </div>
               </div>
             </div>
+          </Card>
 
-            {/* Category selects */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Category</label>
-              <Select
-                options={categories.map((c) => ({ value: c.value, label: c.label, subcategories: c.subcategories }))}
-                value={categories.find((c) => c.value === product.category) ? { value: product.category, label: product.category } : null}
-                onChange={(val) => {
-                  setField("category", val?.value ?? "");
-                  // find original object to set subcategories
-                  const found = categories.find((c) => c.value === (val?.value ?? ""));
-                  setSubcategoriesForSelected(found?.subcategories ?? []);
-                  setField("subCategory", "");
-                  setField("subSubCategory", "");
-                }}
-                isClearable
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+          {/* CATEGORY */}
+          <Card className="p-6">
+            <SectionHeader title="Category" subtitle="Choose proper category to auto-enable relevant options" color="from-indigo-500 to-purple-600" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Sub Category</label>
-                <select className={inputBox} value={product.subCategory} onChange={(e) => setField("subCategory", e.target.value)}>
-                  <option value="">Select subcategory</option>
-                  {subcategoriesForSelected.map((s, idx) => (
-                    <option key={idx} value={s}>
-                      {s}
+                <Label>Category</Label>
+                <select name="category" value={product.category} onChange={handleChange} className="w-full p-2 border rounded-xl">
+                  <option value="">Select Category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Sub-Sub Category</label>
-                <input type="text" className={inputBox} value={product.subSubCategory} onChange={(e) => setField("subSubCategory", e.target.value)} placeholder="Optional" />
+                <Label>Subcategory</Label>
+                <select name="subCategory" value={product.subCategory} onChange={handleChange} className="w-full p-2 border rounded-xl" disabled={!subCategories.length}>
+                  <option value="">Select Subcategory</option>
+                  {subCategories.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label>Sub-Subcategory</Label>
+                <select name="subSubCategory" value={product.subSubCategory} onChange={handleChange} className="w-full p-2 border rounded-xl" disabled={!subSubCategories.length}>
+                  <option value="">Select Sub-Subcategory</option>
+                  {subSubCategories.map((s, i) => (
+                    <option key={`${s}-${i}`} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Sizes multi-select + custom */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Sizes</label>
-              <Select
-                options={sizeOptions}
-                isMulti
-                value={sizeOptions.filter((s) => product.sizes.includes(s.value))}
-                onChange={(selected) => setField("sizes", selected.map((s) => s.value))}
-              />
-              <div className="flex gap-2 mt-3">
-                <input type="text" className={`${inputBox} flex-1`} placeholder="Add custom size (e.g., 2XL or 30)" value={customSize} onChange={(e) => setCustomSize(e.target.value)} />
-                <button onClick={addCustomSize} type="button" className="px-4 py-2 bg-[#0A1A3A] text-white rounded-xl">Add</button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {(product.sizes || []).map((s) => (
-                  <span key={s} className="px-3 py-1 bg-gray-100 rounded-full text-sm inline-flex items-center gap-2">
-                    {s}
-                    <button type="button" onClick={() => removeSize(s)} className="text-xs text-red-500 ml-1">x</button>
-                  </span>
+            <div className="mt-3 text-sm text-gray-500">Tip: Choose Category → Subcategory → Sub-Subcategory to auto-enable sizes and other relevant fields.</div>
+          </Card>
+
+          {/* SIZES */}
+          <Card className="p-6">
+            <SectionHeader title="Sizes" subtitle="Pick sizes depending on the product type" color="from-amber-500 to-orange-500" />
+
+            <div className="flex gap-3 mb-4">
+              <button
+                type="button"
+                className={`px-4 py-1 rounded-full border ${sizeMode === "shoes" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-700"}`}
+                onClick={() => setSizeMode("shoes")}
+              >
+                Shoes Sizes
+              </button>
+
+              <button
+                type="button"
+                className={`px-4 py-1 rounded-full border ${sizeMode === "clothing" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-700"}`}
+                onClick={() => setSizeMode("clothing")}
+              >
+                Clothing Sizes
+              </button>
+
+              <button
+                type="button"
+                className={`px-4 py-1 rounded-full border ${sizeMode === "other" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-700"}`}
+                onClick={() => setSizeMode("other")}
+              >
+                Custom
+              </button>
+            </div>
+
+            <SizeSelector mode={sizeMode} selectedSizes={product.sizes} onToggle={toggleSize} />
+
+            <div className="mt-4">
+              <div className="text-sm text-gray-600 mb-2">Selected sizes</div>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.length === 0 ? <span className="text-sm text-gray-400">No sizes selected</span> : product.sizes.map((s) => (
+                  <div key={s} className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-sm">
+                    <span>{s}</span>
+                    <button type="button" onClick={() => toggleSize(s)} className="text-gray-400 hover:text-red-500">
+                      <FaTrash />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Colors + Expiry */}
-            <div className="grid grid-cols-2 gap-3">
+            {product.sizes.length > 0 && (
+              <div className="mt-4">
+                <Label>Stock per size</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {product.sizes.map((s) => (
+                    <div key={s}>
+                      <div className="text-sm mb-1">{s}</div>
+                      <Input type="number" min="0" value={product.stockPerSize?.[s] ?? ""} onChange={(e) => setStockForSize(s, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* COLORS */}
+          <Card className="p-6">
+            <SectionHeader title="Colors" subtitle="Add colors using the picker or paste hex codes" color="from-emerald-400 to-teal-400" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Color</label>
-                <div className="rounded-xl bg-gray-100 p-3">
-                  <HexColorPicker color={product.color} onChange={(c) => setField("color", c)} />
+                <Label><FaPalette className="inline mr-2 text-emerald-500" /> Pick color</Label>
+                <div className="p-3 border rounded-xl bg-white">
+                  <HexColorPicker color={currentColor} onChange={setCurrentColor} />
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="w-8 h-8 rounded border" style={{ background: currentColor }} />
+                    <div className="text-sm font-medium">{currentColor}</div>
+                    <button type="button" onClick={addColor} className="ml-auto px-3 py-1 rounded-lg bg-rose-500 text-white">Add</button>
+                  </div>
                 </div>
               </div>
 
+              <div className="md:col-span-2">
+                <Label>Selected Colors</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {colors.length === 0 ? <div className="text-sm text-gray-400">No colors added</div> : colors.map((c) => (
+                    <div key={c} className="flex items-center gap-2 px-3 py-1 border rounded-lg">
+                      <div className="w-6 h-6 rounded" style={{ background: c }} />
+                      <div className="text-sm">{c}</div>
+                      <button type="button" onClick={() => removeColor(c)} className="ml-2 text-red-500"><FaTrash /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* INVENTORY & MEDIA */}
+          <Card className="p-6">
+            <SectionHeader title="Inventory & Media" subtitle="Stock, warranty, images and shipping details" color="from-sky-500 to-cyan-500" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Expiry Date</label>
-                <DatePicker selected={product.expiryDate} onChange={(d) => setField("expiryDate", d)} className={inputBox} />
+                <Label>Stock (total)</Label>
+                <Input name="stock" type="number" value={product.stock} onChange={handleChange} />
               </div>
+
+              <div>
+                <Label>Warranty (type & duration)</Label>
+                <div className="flex gap-2">
+                  <Input name="warrantyType" placeholder="Type (e.g. Manufacturer)" value={product.warranty.type} onChange={(e) => setProduct((p) => ({ ...p, warranty: { ...p.warranty, type: e.target.value } }))} />
+                  <Input name="warrantyDuration" placeholder="Duration (e.g. 1 year)" value={product.warranty.duration} onChange={(e) => setProduct((p) => ({ ...p, warranty: { ...p.warranty, duration: e.target.value } }))} />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mt-4">
+                <input name="isMain" type="checkbox" checked={product.isMain} onChange={handleChange} className="w-4 h-4" />
+                <div className="text-sm">Main Product (featured)</div>
+              </div>
+
+              <div className="md:col-span-2">
+                <MediaUploader images={images} setImages={setImages} videos={videos} onVideosChange={handleVideosChange} />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <Label>Shipping (dimensions)</Label>
+              <ShippingSection shipping={product.shipping} onChange={handleShippingChange} onDimensionChange={handleDimensionChange} />
+            </div>
+          </Card>
+
+          {/* PREVIEW & CTA */}
+          <div className="flex flex-col md:flex-row gap-4 items-start">
+            <div className="w-full md:w-1/3">
+              <Card className="p-4">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-full h-48 rounded-xl overflow-hidden bg-gradient-to-br from-gray-50 to-white border flex items-center justify-center">
+                    <img src={images[0]?.url ?? product.images[0] ?? UPLOADED_PREVIEW} alt="preview" className="object-cover w-full h-full" />
+                  </div>
+                  <div className="w-full text-sm text-gray-600 text-center">Preview (first image or sample)</div>
+
+                  <div className="mt-3 w-full">
+                    <div className="flex gap-2 overflow-x-auto">
+                      {images.map((it) => (
+                        <div key={it.id} className="w-20 h-20 rounded overflow-hidden border relative">
+                          <img src={it.url} alt="thumb" className="object-cover w-full h-full" />
+                          <button type="button" onClick={() => setImages((prev) => {
+                            // revoke objectURL if needed
+                            const found = prev.find(x => x.id === it.id);
+                            if (found && found.file && found.url) {
+                              try { URL.revokeObjectURL(found.url); } catch {}
+                            }
+                            return prev.filter((x) => x.id !== it.id);
+                          })} className="absolute top-1 right-1 p-1 bg-white rounded">
+                            <FaTrash />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="flex-1">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Finalize & Publish</h3>
+                    <p className="text-sm text-gray-500">Review all details and publish your product to the store.</p>
+                  </div>
+                  <div className="text-sm text-gray-400">Status: Draft</div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button type="button" className="px-4 py-3 rounded-lg border hover:bg-gray-50">Save Draft</button>
+                  <button type="submit" className={`px-4 py-3 rounded-lg text-white ${submitLoading ? "bg-rose-400" : "bg-rose-600 hover:bg-rose-700"}`}>
+                    {submitLoading ? "Publishing..." : <><FaCheck className="inline mr-2" /> Add Product</>}
+                  </button>
+                </div>
+
+              </Card>
             </div>
           </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="space-y-4">
-
-            {/* Warranty */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Warranty</label>
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Type (e.g., Manufacturer)" className={inputBox} value={product.warranty.type} onChange={(e) => setWarrantyField("type", e.target.value)} />
-                <input type="text" placeholder="Duration (e.g., 1 year)" className={inputBox} value={product.warranty.duration} onChange={(e) => setWarrantyField("duration", e.target.value)} />
-              </div>
-            </div>
-
-            {/* Shipping */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Shipping</label>
-
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Weight (e.g., 0.5kg)" className={inputBox} value={product.shipping.weight} onChange={(e) => setShippingField("weight", e.target.value)} />
-                <input type="text" placeholder="Delivery Time (e.g., 3-5 days)" className={inputBox} value={product.shipping.deliveryTime} onChange={(e) => setShippingField("deliveryTime", e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mt-3 items-end">
-                <input type="number" placeholder="Length" className={inputBox} value={product.shipping.dimensions.length} onChange={(e) => setShippingDimension("length", e.target.value)} />
-                <input type="number" placeholder="Width" className={inputBox} value={product.shipping.dimensions.width} onChange={(e) => setShippingDimension("width", e.target.value)} />
-                <input type="number" placeholder="Height" className={inputBox} value={product.shipping.dimensions.height} onChange={(e) => setShippingDimension("height", e.target.value)} />
-              </div>
-
-              <div className="flex gap-3 mt-3">
-                <input type="text" placeholder="Dimension unit (cm/in)" className={inputBox} value={product.shipping.dimensions.unit} onChange={(e) => setShippingDimension("unit", e.target.value)} />
-                <input type="number" placeholder="Shipping charge (₹)" className={inputBox} value={product.shipping.shippingCharge} onChange={(e) => setShippingField("shippingCharge", e.target.value)} />
-              </div>
-
-              <textarea placeholder="Return policy (optional)" className={`${inputBox} mt-3`} value={product.shipping.returnPolicy} onChange={(e) => setShippingField("returnPolicy", e.target.value)} />
-            </div>
-
-            {/* Variants (IDs) */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Variants (IDs comma separated)</label>
-              <input type="text" className={inputBox} value={(product.variants || []).join(",")} onChange={(e) => setField("variants", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} placeholder="variantId1, variantId2" />
-            </div>
-
-            {/* Images upload */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Product Images (multiple)</label>
-              <input type="file" accept="image/*" multiple onChange={handleImagesChange} />
-              <div className="flex flex-wrap gap-3 mt-3">
-                {imagePreviews.map((src, idx) => (
-                  <div key={idx} className="relative w-28 h-28 rounded-xl overflow-hidden border">
-                    <img src={src} alt={`preview-${idx}`} className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => removeImageAt(idx)} className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-red-600 shadow">x</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Videos upload */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Product Videos (optional)</label>
-              <input type="file" accept="video/*" multiple onChange={handleVideosChange} />
-              <div className="flex flex-wrap gap-3 mt-3">
-                {videoPreviews.map((src, idx) => (
-                  <div key={idx} className="relative w-36 h-24 rounded-md overflow-hidden border">
-                    <video src={src} controls className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => removeVideoAt(idx)} className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-red-600 shadow">x</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Views */}
-            <div>
-              <label className="font-semibold text-gray-700 mb-2 block">Views</label>
-              <input type="number" className={inputBox} value={product.views} onChange={(e) => setField("views", e.target.value)} />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex justify-end gap-4 mt-4">
-              <button type="button" onClick={closeModal} className="px-6 py-2 rounded-xl bg-gray-200 hover:bg-gray-300">Cancel</button>
-              <button type="button" onClick={handleSave} className="px-6 py-2 rounded-xl bg-[#0A1A3A] text-white">Save Product</button>
-            </div>
-          </div>
-        </div>
+        </form>
       </div>
-    </motion.div>
     </AdminLayout>
   );
-};
-
-export default AddProduct;
+}
